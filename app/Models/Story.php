@@ -12,6 +12,8 @@ class Story extends Model
 {
     use HasFactory;
 
+    const TYPE = ['title', 'author', 'tags'];
+
     // Ngưỡng view để xác định truyện Hot
     const HOT_VIEW_THRESHOLD = 1000;
 

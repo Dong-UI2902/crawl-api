@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Events\StoryCreated;
+use App\Http\Requests\SearchRequest;
 use App\Http\Requests\StoryRequest;
+use App\Models\Author;
 use App\Models\Story;
 use App\Services\CrawlService;
 use App\Services\StoryService;
@@ -116,5 +118,35 @@ class StoryController extends Controller
         Story::where('slug', $slug)->first()->delete();
 
         return response()->json()->setStatusCode(Response::HTTP_NO_CONTENT);
+    }
+
+    public function search(SearchRequest $request)
+    {
+        $type = $request->query('type');
+        $value = $request->query('value');
+
+        $query = Story::query();
+
+        switch ($type) {
+            case 'title':
+                $query->where('title', 'like', "%{$value}%");
+                break;
+
+            case 'author':
+                $query->whereHas('author', function ($q) use ($value) {
+                    $q->where('name', 'like', "%{$value}%");
+                });
+                break;
+
+            default:
+                $query->whereHas('tags', function ($q) use ($value) {
+                    $q->where('name', 'like', "%{$value}%")
+                        ->orWhere('slug', 'like', "%{$value}%");
+                });
+        }
+
+        return response()
+            ->json($query->latest()->paginate(20))
+            ->setStatusCode(Response::HTTP_OK);
     }
 }
