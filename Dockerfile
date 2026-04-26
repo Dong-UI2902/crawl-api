@@ -9,10 +9,14 @@ RUN apk update && apk add --no-cache \
     zip \
     unzip \
     curl \
-    sqlite-dev
+    mysql-client \
+    mariadb-connector-c-dev
+
+# Remove Cache
+RUN rm -rf /var/cache/apk/*
 
 # Cài đặt các extension PHP cần thiết cho Laravel
-RUN docker-php-ext-install pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd zip
+RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Lấy Composer bản mới nhất
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

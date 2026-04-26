@@ -22,3 +22,4 @@ yarn-error.log
 
 .github/
 .junie/
+/mysql_data
