@@ -8,6 +8,7 @@ use App\Models\Chapter;
 use App\Services\CrawlService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Symfony\Component\BrowserKit\HttpBrowser;
 
@@ -27,20 +28,26 @@ class ChapterController extends Controller
      */
     public function store(ChapterRequest $request)
     {
-        $chapter = Chapter::create($request->all());
+        $data = $request->all();
+        $chapter = Chapter::firstOrCreate(
+            [
+                'story_id' => $data['story_id'],
+                'slug' => $data['slug'],
+            ],
+            $data,
+        );
 
-        return response()->json($chapter, Response::HTTP_CREATED);
+        return response()->json($chapter)->setStatusCode(Response::HTTP_CREATED);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $storySlug, string $chapterSlug)
     {
-        /** @var \App\Models\Chapter $chapter */
-        $chapter = Chapter::with(['images', 'story'])
+        $chapter = Chapter::with([
+            'story:id,title,slug', // Chỉ lấy những cột cần thiết cho nhẹ
+            'images' => fn($q) => $q->orderBy('order', 'asc')
+        ])
             ->where('slug', $chapterSlug)
-            ->whereHas('story', function($q) use ($storySlug) {
+            ->whereHas('story', function ($q) use ($storySlug) {
                 $q->where('slug', $storySlug);
             })
             ->firstOrFail();
@@ -48,25 +55,39 @@ class ChapterController extends Controller
         if (!Str::contains($chapter->title, 'Oneshot'))
             event(new ChapterViewed($chapter));
 
-        $images = $chapter->images;
-        if ($images->isNotEmpty()) {
-            return response()->json([
-                'images' => $images,
-            ], Response::HTTP_OK);
+
+        if ($chapter->images->isNotEmpty()) {
+            return $this->responseFunction($chapter);
         }
 
-        return response()->json([
-            'chapter_title' => $chapter->title,
-            'images' => $images,
-        ], Response::HTTP_OK);
+        return Cache::lock('crawl_chapter_' . $chapter->id, 60)->get(function () use ($chapter) {
+            if ($chapter->images()->exists()) {
+                return $this->responseFunction($chapter);
+            }
+
+            $imagesData = $this->crawlService->crawlImages($chapter);
+
+            if (empty($imagesData)) {
+                return response()->json(['message' => 'Không tìm thấy ảnh nào.'], 404);
+            }
+
+            $chapter->images()->createMany($imagesData);
+
+            return $this->responseFunction($chapter, $imagesData);
+        });
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Chapter $chapter)
+    private function responseFunction(Chapter $chapter, ?array $imagesData)
     {
-        //
+        return response()->json([
+            'story' => $chapter->story, // Đã có sẵn nhờ Eager Loading
+            'chapter' => [
+                'title' => $chapter->title,
+                'slug' => $chapter->slug,
+                'images' => $imagesData ?? $chapter->getSortedImages(),
+                'navigation' => $chapter->getNavigationLinks(),
+            ]
+        ])->setStatusCode(Response::HTTP_OK);
     }
 
     /**
