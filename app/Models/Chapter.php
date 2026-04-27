@@ -12,6 +12,7 @@ class Chapter extends Model
     use HasFactory;
 
     const TIME_LOCK = 60;
+    const CACHE_TTL_DAYS = 7;
 
     protected $guarded = ['id'];
 
