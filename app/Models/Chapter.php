@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Chapter extends Model
 {
@@ -44,19 +45,21 @@ class Chapter extends Model
             ];
         }
 
-        $prev = self::where('story_id', $this->story_id)
-            ->where('id', '<', $this->id)
-            ->orderBy('id', 'desc')
-            ->first(['slug']);
+        return Cache::remember("chapter_nav_{$this->id}", now()->addDays(self::CACHE_TTL_DAYS), function () {
+            $prev = self::where('story_id', $this->story_id)
+                ->where('id', '<', $this->id)
+                ->orderBy('id', 'desc')
+                ->first(['slug']);
 
-        $next = self::where('story_id', $this->story_id)
-            ->where('id', '>', $this->id)
-            ->orderBy('id', 'asc')
-            ->first(['slug']);
+            $next = self::where('story_id', $this->story_id)
+                ->where('id', '>', $this->id)
+                ->orderBy('id', 'asc')
+                ->first(['slug']);
 
-        return [
-            'prev_slug' => $prev?->slug,
-            'next_slug' => $next?->slug,
-        ];
+            return [
+                'prev_slug' => $prev?->slug,
+                'next_slug' => $next?->slug,
+            ];
+        });
     }
 }
