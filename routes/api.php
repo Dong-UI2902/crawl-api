@@ -27,6 +27,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/stories', [StoryController::class, 'store']);
 
     Route::get('/stories', [StoryController::class, 'index']);
+    Route::get('/stories/home', [StoryController::class, 'getHomeSections']);
     Route::get('/stories/search', [StoryController::class, 'search']);
     Route::get('/stories/{slug}', [StoryController::class, 'show']);
 
