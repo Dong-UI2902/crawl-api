@@ -31,7 +31,7 @@ class StoryRequest extends FormRequest
                 'slug' => 'required|string',
                 'author_id' => 'required|exists:authors,id',
                 'thumbnail' => 'required|unique:stories,thumbnail',
-                'source_url' => 'required|unique:stories|url',
+                'source_url' => 'required|unique:stories, source_url|url',
                 'status' => 'required|boolean',
             ];
         };
