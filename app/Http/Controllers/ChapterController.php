@@ -57,16 +57,7 @@ class ChapterController extends Controller
             event(new ChapterViewed($chapter));
 
         if ($chapter->images->isNotEmpty()) {
-            $cacheKey = "chapter_content_" . $chapter->id;
-
-            $data = Cache::remember($cacheKey, now()->addDays(Chapter::CACHE_TTL_DAYS), function () use ($chapter) {
-                return [
-                    'images' => $chapter->getSortedImages(),
-                    'navigation' => $chapter->getNavigationLinks(),
-                ];
-            });
-
-            return $this->responseFunction($chapter, $data['images']);
+            return $this->responseWithCache($chapter);
         }
 
         return Cache::lock('crawl_chapter_' . $chapter->id, Chapter::TIME_LOCK)->get(function () use ($chapter) {
@@ -93,7 +84,11 @@ class ChapterController extends Controller
     private function responseFunction(Chapter $chapter, $imagesData = null)
     {
         return response()->json([
-            'story' => $chapter->story,
+            'story' => [
+                'id' => $chapter->story->id,
+                'title' => $chapter->story->title,
+                'slug' => $chapter->story->slug,
+            ],
             'chapter' => [
                 'title' => $chapter->title,
                 'slug' => $chapter->slug,
@@ -114,15 +109,7 @@ class ChapterController extends Controller
             ];
         });
 
-        return response()->json([
-            'story' => $chapter->story,
-            'chapter' => [
-                'title' => $chapter->title,
-                'slug' => $chapter->slug,
-                'images' => $data['images'],
-                'navigation' => $data['navigation'],
-            ]
-        ]);
+        return $this->responseFunction($chapter, $data['images']);
     }
 
     /**
