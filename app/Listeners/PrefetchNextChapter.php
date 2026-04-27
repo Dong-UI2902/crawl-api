@@ -31,7 +31,7 @@ class PrefetchNextChapter implements ShouldQueue
             ->orderBy('id', 'asc')
             ->first();
 
-        if ($nextChapter && $nextChapter->images()->count() === 0) {
+        if ($nextChapter && $nextChapter->images()->exist() === 0) {
             CrawlChapterImages::dispatch($nextChapter);
         }
     }
