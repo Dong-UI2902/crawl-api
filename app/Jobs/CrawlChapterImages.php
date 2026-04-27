@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -17,24 +18,29 @@ class CrawlChapterImages implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    protected $chapter;
+
     /**
      * Số lần thử lại tối đa nếu Job thất bại
      */
-    public $tries = 3;
-
-    /**
-     * Số giây Job được phép chạy trước khi timeout
-     * Cào ảnh có thể lâu nên để khoảng 2-5 phút
-     */
-    public $timeout = 300;
+    const TRIES = 3;
 
     /**
      * Số giây Job thử lại lần tiếp theo nếu thất bại
      */
-    public $waitingTime = 30;
+    const WAITING_TIME = 30;
 
-    protected $chapter;
+    public function backoff()
+    {
+        return [60, 120, 300, 600]; // Lần 1 đợi 1p, lần 2 đợi 2p, lần 3 đợi 5p...
+    }
 
+    public function failed(Exception $exception)
+    {
+        Log::error("Job cào ảnh THẤT BẠI HOÀN TOÀN sau nhiều lần thử. Chapter ID: {$this->chapter->id}. Lỗi: " . $exception->getMessage());
+
+        // bắn thông báo Telegram/Slack ở đây để biết đường sửa bot
+    }
 
     /**
      * Create a new job instance.
@@ -51,35 +57,35 @@ class CrawlChapterImages implements ShouldQueue
      */
     public function handle(CrawlService $crawlService)
     {
-        // Chương đã có ảnh rồi thì không cào lại nữa
-        if ($this->chapter->images()->exists()) {
-            return;
-        }
-
-        try {
-            Log::info("Bắt đầu cào ảnh cho chương: ID {$this->chapter->id} - {$this->chapter->title}");
-
-            $imageUrls = $crawlService->crawlImages($this->chapter);
-
-            if (empty($imageUrls)) {
-                throw new Exception("Không tìm thấy ảnh nào từ nguồn.");
+        return Cache::lock('crawl_chapter_' . $this->chapter->id, Chapter::TIME_LOCK)->get(function () use ($crawlService) {
+            // Chương đã có ảnh rồi thì không cào lại nữa
+            if ($this->chapter->images()->exists()) {
+                return;
             }
 
-            DB::transaction(function () use ($imageUrls) {
-                foreach ($imageUrls as $imageData) {
-                    $this->chapter->images()->create([
-                        'src' => $imageData['src'],
-                        'order' => $imageData['order'],
-                    ]);
+            try {
+                Log::info("Bắt đầu cào ảnh cho chương: ID {$this->chapter->id} - {$this->chapter->title}");
+
+                $imageUrls = $crawlService->crawlImages($this->chapter);
+
+                if (empty($imageUrls))
+                    throw new Exception("Không tìm thấy ảnh nào từ nguồn.");
+
+                DB::transaction(function () use ($imageUrls) {
+                    $this->chapter->images()->createMany($imageUrls);
+                });
+
+                Log::info("Đã lưu " . count($imageUrls) . " ảnh cho Chapter ID: {$this->chapter->id}");
+            } catch (Exception $e) {
+                Log::error("Lỗi khi cào ảnh chương {$this->chapter->id}: " . $e->getMessage());
+
+                if ($this->attempts() >= self::TRIES) {
+                    throw $e;
                 }
-            });
 
-            Log::info("Đã lưu " . count($imageUrls) . " ảnh cho Chapter ID: {$this->chapter->id}");
-        } catch (Exception $e) {
-            Log::error("Lỗi khi cào ảnh chương {$this->chapter->id}: " . $e->getMessage());
-
-            // Đẩy lại vào hàng chờ để thử lại sau $waitingTime nếu chưa quá số lần $tries
-            $this->release($this->waitingTime);
-        }
+                // Đẩy lại vào hàng chờ để thử lại sau $waitingTime nếu chưa quá số lần $tries
+                $this->release(self::WAITING_TIME);
+            }
+        });
     }
 }
