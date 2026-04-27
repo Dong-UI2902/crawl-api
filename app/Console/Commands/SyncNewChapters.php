@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\SyncChapterForStory;
 use App\Models\Story;
 use App\Services\ChapterService;
 use Illuminate\Console\Command;
@@ -27,32 +28,27 @@ class SyncNewChapters extends Command
      */
     public function handle(ChapterService $chapterService)
     {
-        // Lấy danh sách truyện cần sync
-        $stories = Story::where('status', 'ongoing')
-            ->where(function($query) {
-                $query->where(function($q) {
-                    // Nhóm Hot: 1 tiếng quét 1 lần
-                    $q->where('views', '>', Story::HOT_VIEW_THRESHOLD)
-                        ->where('last_synced_at', '<', now()->subMinutes(Story::SYNC_INTERVAL_HOT));
-                })
-                    ->orWhere(function($q) {
-                        // Nhóm Thường: 24 tiếng mới quét 1 lần
-                        $q->where('views', '<=', Story::HOT_VIEW_THRESHOLD)
-                            ->where('last_synced_at', '<', now()->subMinutes(Story::SYNC_INTERVAL_NORMAL));
-                    });
-            })
-            ->inRandomOrder() // Trộn ngẫu nhiên trong những bộ đã đến hạn
-            ->limit(10)
-            ->get();
+        // Lấy dư ra một chút rồi shuffle bằng PHP để tránh inRandomOrder của SQL
+        $stories = Story::needSync()
+            ->orderBy('last_synced_at', 'asc') // Ưu tiên bộ "đói" sync nhất
+            ->limit(20)
+            ->get()
+            ->shuffle()
+            ->take(10);
+
+        if ($stories->isEmpty()) {
+            $this->info("Không có truyện nào cần sync.");
+            return;
+        }
 
         foreach ($stories as $story) {
-            $this->info("Đang kiểm tra bộ: " . $story->title);
-
-            // 2. Gọi Service để xử lý
-            $chapterService->syncChapters($story);
-
-            // 3. Cập nhật thời gian đã quét
+            // Cập nhật ngay để các tiến trình chạy sau không lấy trùng bộ này
             $story->update(['last_synced_at' => now()]);
+
+            // Đẩy vào Queue để xử lý song song, không bắt Command phải đợi
+            SyncChapterForStory::dispatch($story);
+
+            $this->info("Đã đẩy bộ [{$story->title}] vào hàng chờ.");
         }
     }
 }

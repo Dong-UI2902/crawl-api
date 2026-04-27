@@ -16,6 +16,7 @@ class Kernel extends ConsoleKernel
 
         // Cứ mỗi 30 phút, chạy lệnh quét cập nhật truyện một lần
         $schedule->command('sync:new-chapters')->everyThirtyMinutes();
+        $schedule->command('stories:update-weekly')->weeklyOn(0, '23:59');
     }
 
     /**

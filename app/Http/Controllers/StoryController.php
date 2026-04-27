@@ -10,6 +10,7 @@ use App\Services\CrawlService;
 use App\Services\StoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\BrowserKit\HttpBrowser;
 
 class StoryController extends Controller
@@ -28,14 +29,7 @@ class StoryController extends Controller
     public function index(): JsonResponse
     {
         $stories = Story::Query()
-            ->select([
-                'id',
-                'title',
-                'thumbnail',
-                'slug',
-                'latest_chapter',
-                'views'
-            ])
+            ->select($this->getFields())
             ->latest()
             ->paginate();
 
@@ -153,5 +147,41 @@ class StoryController extends Controller
         return response()
             ->json($query->latest()->paginate(20))
             ->setStatusCode(Response::HTTP_OK);
+    }
+
+    public function getHomeSections()
+    {
+        $hotStories = Cache::remember(
+            Story::CACHE_KEY_HOT,
+            now()->addHours(config('settings.cache_duration')),
+            fn() => Story::hot()->limit(Story::LIMIT_HOT)->get()
+        );
+
+        $hotWeeklyStories = Cache::remember(
+            Story::CACHE_KEY_HOT_WEEKLY,
+            now()->addMinutes(Story::CACHE_TTL_HOT_WEEKLY),
+            function () {
+                return Story::hotThisWeek()
+                    ->limit(Story::LIMIT_HOT)
+                    ->get($this->getFields());
+            }
+        );
+
+        return response()->json([
+            'hot' => $hotStories,
+            'hot_weekly' => $hotWeeklyStories,
+        ]);
+    }
+
+    public function getFields(): array
+    {
+        return [
+            'id',
+            'title',
+            'thumbnail',
+            'slug',
+            'latest_chapter',
+            'views'
+        ];
     }
 }
