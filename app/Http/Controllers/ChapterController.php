@@ -56,9 +56,17 @@ class ChapterController extends Controller
         if (!Str::contains($chapter->title, 'Oneshot'))
             event(new ChapterViewed($chapter));
 
-
         if ($chapter->images->isNotEmpty()) {
-            return $this->responseFunction($chapter);
+            $cacheKey = "chapter_content_" . $chapter->id;
+
+            $data = Cache::remember($cacheKey, now()->addDays(Chapter::CACHE_TTL_DAYS), function () use ($chapter) {
+                return [
+                    'images' => $chapter->getSortedImages(),
+                    'navigation' => $chapter->getNavigationLinks(),
+                ];
+            });
+
+            return $this->responseFunction($chapter, $data['images']);
         }
 
         return Cache::lock('crawl_chapter_' . $chapter->id, Chapter::TIME_LOCK)->get(function () use ($chapter) {
@@ -84,20 +92,37 @@ class ChapterController extends Controller
 
     private function responseFunction(Chapter $chapter, $imagesData = null)
     {
-        $cacheKey = "chapter_full_{$chapter->id}";
+        return response()->json([
+            'story' => $chapter->story,
+            'chapter' => [
+                'title' => $chapter->title,
+                'slug' => $chapter->slug,
+                'images' => $imagesData ?? $chapter->getSortedImages(),
+                'navigation' => $chapter->getNavigationLinks(),
+            ]
+        ])->setStatusCode(Response::HTTP_OK);
+    }
 
-        return Cache::remember($cacheKey, now()->addDays(Chapter::CACHE_TTL_DAYS),
-            function () use ($chapter, $imagesData) {
-                return response()->json([
-                    'story' => $chapter->story, // Đã có sẵn nhờ Eager Loading
-                    'chapter' => [
-                        'title' => $chapter->title,
-                        'slug' => $chapter->slug,
-                        'images' => $imagesData ?? $chapter->getSortedImages(),
-                        'navigation' => $chapter->getNavigationLinks(),
-                    ]
-                ])->setStatusCode(Response::HTTP_OK);
-            });
+    private function responseWithCache(Chapter $chapter)
+    {
+        $cacheKey = "chapter_content_" . $chapter->id;
+
+        $data = Cache::remember($cacheKey, now()->addDays(Chapter::CACHE_TTL_DAYS), function () use ($chapter) {
+            return [
+                'images' => $chapter->getSortedImages(),
+                'navigation' => $chapter->getNavigationLinks(),
+            ];
+        });
+
+        return response()->json([
+            'story' => $chapter->story,
+            'chapter' => [
+                'title' => $chapter->title,
+                'slug' => $chapter->slug,
+                'images' => $data['images'],
+                'navigation' => $data['navigation'],
+            ]
+        ]);
     }
 
     /**
