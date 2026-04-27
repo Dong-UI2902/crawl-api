@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Events\StoryCreated;
 use App\Http\Requests\SearchRequest;
 use App\Http\Requests\StoryRequest;
-use App\Models\Author;
 use App\Models\Story;
 use App\Services\CrawlService;
 use App\Services\StoryService;
-use App\Services\TagService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Symfony\Component\BrowserKit\HttpBrowser;
@@ -30,7 +28,14 @@ class StoryController extends Controller
     public function index(): JsonResponse
     {
         $stories = Story::Query()
-            ->select(['id', 'title', 'thumbnail', 'slug', 'latest_chapter'])
+            ->select([
+                'id',
+                'title',
+                'thumbnail',
+                'slug',
+                'latest_chapter',
+                'views'
+            ])
             ->latest()
             ->paginate();
 
@@ -79,7 +84,7 @@ class StoryController extends Controller
             $story = Story::with([
                 'author:id,name,slug',
                 'chapters' => function ($query) {
-                    $query->select('id', 'story_id', 'title', 'slug', 'created_at');
+                    $query->select('id', 'story_id', 'title', 'slug');
                 },
                 'tags:id,name,slug',
             ])->where('slug', $slug)->firstOrFail();
