@@ -11,6 +11,8 @@ class Chapter extends Model
 {
     use HasFactory;
 
+    const TIME_LOCK = 60;
+
     protected $guarded = ['id'];
 
     public function images(): HasMany

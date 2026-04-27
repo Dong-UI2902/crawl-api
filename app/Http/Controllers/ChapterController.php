@@ -9,6 +9,7 @@ use App\Services\CrawlService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\BrowserKit\HttpBrowser;
 
@@ -60,7 +61,7 @@ class ChapterController extends Controller
             return $this->responseFunction($chapter);
         }
 
-        return Cache::lock('crawl_chapter_' . $chapter->id, 60)->get(function () use ($chapter) {
+        return Cache::lock('crawl_chapter_' . $chapter->id, Chapter::TIME_LOCK)->get(function () use ($chapter) {
             if ($chapter->images()->exists()) {
                 return $this->responseFunction($chapter);
             }
@@ -68,12 +69,16 @@ class ChapterController extends Controller
             $imagesData = $this->crawlService->crawlImages($chapter);
 
             if (empty($imagesData)) {
-                return response()->json(['message' => 'Không tìm thấy ảnh nào.'], 404);
+                return response()
+                    ->json(['message' => 'Không tìm thấy ảnh nào.'])
+                    ->setStatusCode(Response::HTTP_NOT_FOUND);
             }
 
-            $chapter->images()->createMany($imagesData);
+            return DB::transaction(function () use ($chapter, $imagesData) {
+                $chapter->images()->createMany($imagesData);
 
-            return $this->responseFunction($chapter, $imagesData);
+                return $this->responseFunction($chapter, $imagesData);
+            });
         });
     }
 
