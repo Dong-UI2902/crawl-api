@@ -21,8 +21,21 @@ class StoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'url' =>     'required|url|unique:stories,source_url',
+        $rules = [
+            'url' => 'required|url|unique:stories,source_url',
         ];
+
+        if ($this->isMethod(self::METHOD_PUT)) {
+            $rules = [
+                'title' => 'required|string',
+                'slug' => 'required|string',
+                'author_id' => 'required|exists:authors,id',
+                'thumbnail' => 'required|unique:stories,thumbnail',
+                'source_url' => 'required|unique:stories, url',
+                'status' => 'required|boolean',
+            ];
+        };
+
+        return $rules;
     }
 }
