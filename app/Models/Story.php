@@ -21,6 +21,12 @@ class Story extends Model
     const SYNC_INTERVAL_HOT = 60;    // 1 tiếng
     const SYNC_INTERVAL_NORMAL = 1440; // 24 tiếng
 
+    public const LIMIT_HOT = 10;
+    public const CACHE_KEY_HOT = 'stories_hot_section';
+
+    public const CACHE_KEY_HOT_WEEKLY = 'stories_hot_weekly';
+    public const CACHE_TTL_HOT_WEEKLY = 60;
+
     protected $guarded = ['id'];
 
 //    protected $hidden = ['author_id', 'created_at', 'updated_at', 'source_url'];
@@ -48,5 +54,29 @@ class Story extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'story_tags', 'story_id', 'tag_id');
+    }
+
+    public function scopeHot($query) {
+        return $query->orderBy('views', 'desc');
+    }
+
+    public function scopeHotThisWeek($query)
+    {
+        // Sắp xếp theo (view tổng - view chốt tuần trước) = view mới trong tuần này
+        return $query->orderByRaw('(views - views_last_week) DESC');
+    }
+
+    public function scopeNeedSync($query)
+    {
+        return $query->where('status', 'ongoing')
+            ->where(function($q) {
+                $q->where(function($hot) {
+                    $hot->where('views', '>', self::HOT_VIEW_THRESHOLD)
+                        ->where('last_synced_at', '<', now()->subMinutes(self::SYNC_INTERVAL_HOT));
+                })->orWhere(function($normal) {
+                    $normal->where('views', '<=', self::HOT_VIEW_THRESHOLD)
+                        ->where('last_synced_at', '<', now()->subMinutes(self::SYNC_INTERVAL_NORMAL));
+                });
+            });
     }
 }

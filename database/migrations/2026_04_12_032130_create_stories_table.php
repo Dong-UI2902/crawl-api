@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('source_url')->nullable();
             $table->enum('status', ['Đã hoàn thành', 'Đang tiến hành'])->default('Đang tiến hành');
             $table->integer('views')->default(0);
+            $table->unsignedInteger('views_last_week')->default(0);
             $table->dateTime('last_synced_at')->default(now());
             $table->timestamps();
 
