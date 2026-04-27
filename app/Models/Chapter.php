@@ -32,7 +32,7 @@ class Chapter extends Model
             return $this->images;
         }
 
-        return $this->images()->orderBy('order', 'asc')->get();
+        return $this->images()->orderBy('order', 'asc')->get(['id', 'src', 'order'])->toArray();
     }
 
     public function getNavigationLinks()
