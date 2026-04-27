@@ -82,17 +82,22 @@ class ChapterController extends Controller
         });
     }
 
-    private function responseFunction(Chapter $chapter, ?array $imagesData)
+    private function responseFunction(Chapter $chapter, $imagesData = null)
     {
-        return response()->json([
-            'story' => $chapter->story, // Đã có sẵn nhờ Eager Loading
-            'chapter' => [
-                'title' => $chapter->title,
-                'slug' => $chapter->slug,
-                'images' => $imagesData ?? $chapter->getSortedImages(),
-                'navigation' => $chapter->getNavigationLinks(),
-            ]
-        ])->setStatusCode(Response::HTTP_OK);
+        $cacheKey = "chapter_full_{$chapter->id}";
+
+        return Cache::remember($cacheKey, now()->addDays(Chapter::CACHE_TTL_DAYS),
+            function () use ($chapter, $imagesData) {
+                return response()->json([
+                    'story' => $chapter->story, // Đã có sẵn nhờ Eager Loading
+                    'chapter' => [
+                        'title' => $chapter->title,
+                        'slug' => $chapter->slug,
+                        'images' => $imagesData ?? $chapter->getSortedImages(),
+                        'navigation' => $chapter->getNavigationLinks(),
+                    ]
+                ])->setStatusCode(Response::HTTP_OK);
+            });
     }
 
     /**
