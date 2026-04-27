@@ -130,7 +130,8 @@ class CrawlService
 
         $imageList = [];
 
-        $imageNode = $crawler->filter($config);
+
+        $imageNode = $crawler->filter($config->image_selector);
 
         if (!$imageNode) {
             $imageNode = $crawler->filter('div')->reduce(function ($node) {
