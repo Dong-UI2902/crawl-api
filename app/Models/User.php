@@ -41,4 +41,11 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function followedStories()
+    {
+        return $this->belongsToMany(Story::class, 'follows')
+            ->withTimestamps()
+            ->orderBy('follows.created_at', 'desc');
+    }
 }
