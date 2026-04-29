@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChapterController;
 use App\Http\Controllers\FollowController;
+use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\StoryController;
 use App\Http\Controllers\TagController;
 use Illuminate\Http\Request;
@@ -51,4 +52,9 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
 
     Route::get('/tags/not-verified', [TagController::class, 'getTagsNotVerified']);
     Route::post('/tags/merge', [TagController::class, 'mergeTags']);
+
+    Route::get('history', [HistoryController::class, 'index']);
+    Route::post('history', [HistoryController::class, 'store']);
+    Route::delete('history/', [HistoryController::class, 'destroy']);
+    Route::delete('history/{storyId}', [HistoryController::class, 'destroy']);
 });

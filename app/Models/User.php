@@ -57,4 +57,17 @@ class User extends Authenticatable
     {
         return $this->role === self::ROLE_ADMIN;
     }
+
+//    public function readingHistories()
+//    {
+//        return $this->hasMany(ReadingHistory::class);
+//    }
+
+    public function readStories()
+    {
+        return $this->belongsToMany(Story::class, 'reading_histories')
+            ->withPivot('chapter_id')
+            ->withTimestamps()
+            ->orderBy('reading_histories.updated_at', 'desc');
+    }
 }
