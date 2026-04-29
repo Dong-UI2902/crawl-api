@@ -12,6 +12,9 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    const ROLE_ADMIN = 1;
+    const ROLE_USER = 0;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -31,6 +34,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'role',
     ];
 
     /**
@@ -47,5 +51,10 @@ class User extends Authenticatable
         return $this->belongsToMany(Story::class, 'follows')
             ->withTimestamps()
             ->orderBy('follows.created_at', 'desc');
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
     }
 }
