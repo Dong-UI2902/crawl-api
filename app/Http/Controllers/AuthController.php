@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -38,5 +40,29 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user
         ])->setStatusCode(Response::HTTP_OK);
+    }
+
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json()
+            ->setStatusCode(Response::HTTP_OK);
+    }
+
+    public function changePassword(ChangePasswordRequest $request)
+    {
+        $user = $request->user();
+
+        if (!Hash::check($request['current_password'], $user->password)) {
+            return response()->json(['message' => 'Mật khẩu hiện tại không đúng'])
+                ->setStatusCode(Response::HTTP_UNAUTHORIZED);
+        }
+
+        $user->password = Hash::make($request['password']);
+        $user->save();
+
+        return response()->json()
+            ->setStatusCode(Response::HTTP_OK);
     }
 }
